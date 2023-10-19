@@ -16,8 +16,15 @@ Data that can be obtains with this solution:
 [ ] Add more explicit comments
 [ ] Add new runtime test
 [ ] Add function to draw results in a plot
-[ ] Clean the code with the DRY credo in mind
+[X] Clean the code with the DRY credo in mind
 [X] Support a loop limit through argument `-l` or `-limit`
+[X] Add a loop iteration display with argument `-d` or `-debug`
+
+Active issues:
+
+- Understanding the reason behind the random deadlock after N pass of loop ? (Maybe the "waiter task" is not ready ?)
+- Understanding the inconsitant base (average) time measured between multiple app execution
+
 ```sh
     $ mybin -l 666
 ```

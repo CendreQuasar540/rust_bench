@@ -9,6 +9,7 @@ edition = "2021"
 tokio = { version = "^1.21.2", features= ["rt-multi-thread", "macros", "sync", "time"]}
 ioprio = "^0.2.0"
 futures-concurrency = "^7.2.1"
+shared = {path = "../shared" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "^0.2.134"
