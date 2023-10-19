@@ -1,0 +1,9 @@
+[workspace]
+members = ["tokio-bench", "smol-bench"]
+resolver="2"
+
+[workspace.package]
+version =  "0.1.0"
+authors = ["CendreQuasar540"]
+edition = "2021"
+description = "Multi project to test rust runtime latency with task and thread"

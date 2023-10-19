@@ -1,0 +1,10 @@
+#Ignore temp and IDE directory
+/target
+/Cargo.lock
+/.vs
+/.vscode
+/.devcontainer
+*.csv
+
+#Exclude ignored file
+!results_chart.csv
