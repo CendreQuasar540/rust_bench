@@ -1,15 +1,15 @@
 /// Implement an asynchroneous task benchchmark for smol runtime
 
-use std::{io::prelude::*, time::{Duration, Instant}, fs::File};
+use std::{io::prelude::*, time::{Duration, Instant}, fs::File, env};
 use smol::{io, channel::* };
-use async_task::{ Task};
+use async_task::Task;
 use async_executor::Executor;
 use futures_lite::{future, future::Zip};
 
-static LOOP_CNT : i32 = 1000;
-static LAZY_START : u64 = 2000;
+const DEFAULT_LOOP_CNT : usize = 1000;
+const LAZY_START : u64 = 2000;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum TaskId {
     A = 0,
     B,
@@ -17,15 +17,15 @@ enum TaskId {
 
 /// Task that store instant and call another task through a given channel
 /// Loop @LOOP_CNT times
-async fn task_generic(tx : Sender<()>, rx : Receiver<()>, trig : Option<Receiver<()>>, id : crate::TaskId) -> Vec<(TaskId, u128)> {
+async fn task_generic(tx : Sender<()>, rx : Receiver<()>, trig : Option<Receiver<()>>, id : crate::TaskId, limit : usize) -> Vec<(TaskId, u128)> {
     //Init
-    let mut iter : i32 = 0;
-    let mut clock : Vec<(crate::TaskId, u128)> = Vec::with_capacity(LOOP_CNT.try_into().unwrap());
+    let mut iter : usize = 0;
+    let mut clock : Vec<(crate::TaskId, u128)> = Vec::with_capacity(limit);
     let instant: Instant  = Instant::now();
     let is_first: bool = trig.is_some();
 
     // Loop
-    while iter < LOOP_CNT {
+    while iter < limit {
         if iter == 0 && is_first {
             _ = trig.as_ref().unwrap().recv().await; }
         else {
@@ -42,6 +42,16 @@ async fn task_generic(tx : Sender<()>, rx : Receiver<()>, trig : Option<Receiver
 /// Return `()` or io error occured during file access.
 fn main() -> io::Result<()> {
 
+    // Read app arguments
+    let mut limit : usize = DEFAULT_LOOP_CNT;
+    let vargs : Vec<String> = env::args().into_iter().collect();
+    for i in 0..vargs.len()
+    {
+        if (vargs[i] == "-l" || vargs[i] == "-limit") && i + 1 < vargs.len() {
+            limit = vargs[i + 1].parse::<usize>().unwrap_or(DEFAULT_LOOP_CNT);
+        }
+    }
+
     // Try to set thread priority
     thread_priority::set_current_thread_priority(thread_priority::ThreadPriority::Max).unwrap_or(());
 
@@ -53,8 +63,8 @@ fn main() -> io::Result<()> {
     // Build task
     let exec = Executor::new();
     let zip: Zip<Task<Vec<(TaskId, u128)>>, Task<Vec<(TaskId, u128)>>> = future::zip(
-        exec.spawn(task_generic(tx1, rx2, Some(rx_trig), TaskId::A)),
-        exec.spawn(task_generic(tx2, rx1, None, TaskId::B))
+        exec.spawn(task_generic(tx1, rx2, Some(rx_trig), TaskId::A, limit)),
+        exec.spawn(task_generic(tx2, rx1, None, TaskId::B, limit))
     );
 
     // Run tasks and print result in a file

@@ -7,28 +7,29 @@ use std::{
     io::prelude::*,
     fs::File,
     thread,
+    env,
 };
 use futures_concurrency::future::Join;
 
-static LOOP_CNT : i32 = 1000;
-static LAZY_START : u64 = 2000;
+const LAZY_START : u64 = 2000;
+const DEFAULT_LOOP_CNT : usize = 1000;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum TaskId {
     A = 0,
     B,
 }
 
 /// Producer used in asynchroneous function
-async fn task_generic(notify : Arc<Notify>, trigger : Option<Arc<Notify>>, id : TaskId) -> Vec<(TaskId, u128)> {
+async fn task_generic(notify : Arc<Notify>, trigger : Option<Arc<Notify>>, id : TaskId, limit : usize) -> Vec<(TaskId, u128)> {
     //Init
-    let mut iter : i32 = 0;
-    let mut clock : Vec<(crate::TaskId, u128)> = Vec::with_capacity(LOOP_CNT.try_into().unwrap());
+    let mut iter : usize = 0;
+    let mut clock : Vec<(crate::TaskId, u128)> = Vec::with_capacity(limit);
     let instant: Instant  = Instant::now();
     let is_first: bool = trigger.is_some();
 
     // Loop
-    while iter < LOOP_CNT {
+    while iter < limit {
         if iter == 0 && is_first {
             trigger.as_ref().unwrap().notified().await; }
         else {
@@ -36,21 +37,22 @@ async fn task_generic(notify : Arc<Notify>, trigger : Option<Arc<Notify>>, id : 
         clock.push((id, instant.elapsed().as_nanos()));
         iter += 1;
         notify.notify_waiters();
+        // if id == TaskId::A { println!("{iter}")};
     }
 
     clock
 }
 
 /// Producer or consumer used in synchrone function
-fn thread_generic(tx : Sender<()>, rx : Receiver<()>, trigger : Option<Receiver<()>>, id : TaskId) -> Vec<(TaskId,u128)> {
+fn thread_generic(tx : Sender<()>, rx : Receiver<()>, trigger : Option<Receiver<()>>, id : TaskId, limit : usize) -> Vec<(TaskId,u128)> {
     //Init
-    let mut iter : i32 = 0;
-    let mut clock : Vec<(crate::TaskId, u128)> = Vec::with_capacity(LOOP_CNT.try_into().unwrap());
+    let mut iter : usize = 0;
+    let mut clock : Vec<(crate::TaskId, u128)> = Vec::with_capacity(limit);
     let instant: Instant = Instant::now();
     let is_first: bool = trigger.is_some();
 
     //Loop
-    while iter < LOOP_CNT {
+    while iter < limit {
         if iter == 0 && is_first {
             _ = trigger.as_ref().unwrap().recv().unwrap(); }
         else {
@@ -66,18 +68,37 @@ fn thread_generic(tx : Sender<()>, rx : Receiver<()>, trigger : Option<Receiver<
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
 
+    // Read app arguments
+    let mut limit : usize = DEFAULT_LOOP_CNT;
+    let vargs : Vec<String> = env::args().into_iter().collect();
+    for i in 0..vargs.len()
+    {
+        if (vargs[i] == "-l" || vargs[i] == "-limit") && i + 1 < vargs.len() {
+            limit = vargs[i + 1].parse::<usize>().unwrap_or(DEFAULT_LOOP_CNT);
+        }
+    }
+
+    // Work but a little "too heavy"
+    // for arg in env::args().into_iter().enumerate() {
+    //     if arg.1 == "-l" || arg.1 == "-limit"  {
+    //         let value: Option<&String> = vargs.get(arg.0 + 1);
+    //         if value.is_some() {
+    //             limit = value.unwrap().parse::<usize>().unwrap_or(DEFAULT_LOOP_CNT);
+    //         }
+    //     }
+    //}
+
     // Try to set thread priority
     thread_priority::set_current_thread_priority(thread_priority::ThreadPriority::Max).unwrap_or(());
 
     //For async and threading
     let trigger = Arc::new(Notify::new());
-    let notify1 = Arc::new(Notify::new());
-    let notify2 = notify1.clone();
+    let notify = Arc::new(Notify::new());
 
     //Tokio tasks
     let tasks = (
-        tokio::task::spawn( task_generic(notify1, Some(trigger.clone()), TaskId::A )),
-        tokio::task::spawn( task_generic(notify2, None, TaskId::B))
+        tokio::task::spawn( task_generic(notify.clone(), Some(trigger.clone()), TaskId::A, limit)),
+        tokio::task::spawn( task_generic(notify.clone(), None, TaskId::B, limit))
     ).join();
     std::thread::sleep(Duration::from_micros(LAZY_START));
     trigger.notify_one();
@@ -89,8 +110,8 @@ async fn main() -> std::io::Result<()> {
     let (tx2, rx2) : (Sender<()>, Receiver<()>) = channel();
     let (tx_trigger,rx_trigger) = channel();
     let threads = (
-        thread::spawn( || thread_generic(tx1, rx2, Some(rx_trigger) ,TaskId::A)),
-        thread::spawn( || thread_generic(tx2, rx1, None, TaskId::B)),
+        thread::spawn( move || thread_generic(tx1, rx2, Some(rx_trigger) ,TaskId::A, (&limit).clone())),
+        thread::spawn( move || thread_generic(tx2, rx1, None, TaskId::B, (&limit).clone())),
     );
     std::thread::sleep(Duration::from_micros(LAZY_START));
     _ = tx_trigger.send(());
@@ -120,8 +141,8 @@ fn format_str(col_a : &Vec<(TaskId, u128)>,  col_b : &Vec<(TaskId, u128)>, title
 
 /// Producer used in asynchroneous function
 async fn producer_task(notify : Arc<Notify>, clock_iter : Arc<AtomicUsize>, clock : Arc<Mutex<Vec<(TaskId, u128)>>> ) {
-    let mut iter : i32 = 0;
-    while iter < LOOP_CNT {
+    let mut iter : usize = 0;
+    while iter < DEFAULT_LOOP_CNT {
         if iter != 0 { notify.notified().await; }
         else { std::thread::sleep(Duration::from_micros(LAZY_START)); }
         let ns: u128 = SystemTime::now().duration_since(UNIX_EPOCH).expect("").as_nanos();
@@ -134,8 +155,8 @@ async fn producer_task(notify : Arc<Notify>, clock_iter : Arc<AtomicUsize>, cloc
 
 /// Consumer used in asynchroneous function
 async fn consumer_task(notify : Arc<Notify>, clock_iter : Arc<AtomicUsize>, clock : Arc<Mutex<Vec<(TaskId, u128)>>>) {
-    let mut iter : i32 = 0;
-    while iter < LOOP_CNT {
+    let mut iter : usize = 0;
+    while iter < DEFAULT_LOOP_CNT {
         notify.notified().await;
         let ns: u128 = SystemTime::now().duration_since(UNIX_EPOCH).expect("").as_nanos();
         clock_iter.fetch_add(1, Ordering::AcqRel);

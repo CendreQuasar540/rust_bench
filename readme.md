@@ -17,6 +17,10 @@ Data that can be obtains with this solution:
 [ ] Add new runtime test
 [ ] Add function to draw results in a plot
 [ ] Clean the code with the DRY credo in mind
+[X] Support a loop limit through argument `-l` or `-limit`
+```sh
+    $ mybin -l 666
+```
 
 # License
 
