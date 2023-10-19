@@ -13,12 +13,14 @@ Data that can be obtains with this solution:
 
 ## Optional evolution
 
-[ ] Add more explicit comments
-[ ] Add new runtime test
-[ ] Add function to draw results in a plot
-[X] Clean the code with the DRY credo in mind
-[X] Support a loop limit through argument `-l` or `-limit`
-[X] Add a loop iteration display with argument `-d` or `-debug`
+List of future evolution...
+
+- [x] Clean the code with the DRY credo in mind
+- [x] Support a loop limit through argument `-l` or `-limit`
+- [x] Add a loop iteration display with argument `-d` or `-debug`
+- [ ] Add more explicit comments
+- [ ] Add new runtime test
+- [ ] Add function to draw results in a plot
 
 Active issues:
 
