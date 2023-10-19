@@ -29,11 +29,13 @@ impl TaskId {
 /// Basic structure to save app settings
 /// It recomended to use it through a singleton pattern to keep
 /// parameters synchronise in all part of the app.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct AppSettings {
     pub limit : usize,
     pub display_iter : bool,
     pub draw_chart : bool,
+    pub worskpace : String,
+    pub output_file : String,
 }
 
 /// Settings class implementation
@@ -43,6 +45,8 @@ impl AppSettings {
             limit : DEFAULT_LOOP_CNT,
             display_iter : false,
             draw_chart : true,
+            worskpace : String::default(),
+            output_file : String::default(),
         };
     }
 }
@@ -77,13 +81,26 @@ pub fn read_app_argument() -> AppSettings {
 "Rust runtime asynchroneous and threading benchmark library (=>just another useless project). Option supported:
     -h(elp): Display this message
     -d(ebug): Display loop iteration in the console
-    -l(imit) <value>: Set new iteration limit for the benchmark (default: 1000)";
+    -l(imit) <value>: Set new iteration limit for the benchmark (default: 1000)
+    -o(output) <path>";
 
     //Match args to an option
-    for i in 0..vargs.len()
+    let mut jump_arg : bool = false;
+    settings.worskpace = vargs[0].clone();
+    for i in 1..vargs.len()
     {
-        if (vargs[i] == "-l" || vargs[i] == "-limit") && i + 1 < vargs.len() {
-            settings.limit = vargs[i + 1].parse::<usize>().unwrap_or(DEFAULT_LOOP_CNT); }
+        if jump_arg {
+            // Just Ignrore this case and check next argument
+            jump_arg = false;
+        }
+        else if (vargs[i] == "-l" || vargs[i] == "-limit") && i + 1 < vargs.len() {
+            settings.limit = vargs[i + 1].parse::<usize>().unwrap_or(DEFAULT_LOOP_CNT);
+            jump_arg = true;
+        }
+        else if (vargs[i] == "-o" || vargs[i] == "-output") && i + 1 < vargs.len() {
+            settings.output_file = vargs[i + 1].clone();
+            jump_arg = true;
+        }
         else if vargs[i] == "-d" || vargs[i] == "-debug" {
             settings.display_iter = true; }
         else if vargs[i] == "-h" || vargs[i] == "-help" {

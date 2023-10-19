@@ -86,19 +86,32 @@ async fn main() -> std::io::Result<()> {
     std::thread::sleep(Duration::from_micros(shared::LAZY_START));
     trigger.notify_one();
     let results: (Result<Vec<(TaskId, u128)>, tokio::task::JoinError>, Result<Vec<(TaskId, u128)>, tokio::task::JoinError>) = tasks.await;
-    shared::format_str(results.0.as_ref().unwrap(), results.1.as_ref().unwrap() ,"tokio_diff.csv")?;
+    if settings.output_file.is_empty() {
+        shared::format_str(results.0.as_ref().unwrap(), results.1.as_ref().unwrap() ,"tokio_diff.csv")?; }
+    else {
+        shared::format_str(results.0.as_ref().unwrap(), results.1.as_ref().unwrap() ,settings.output_file.as_str())?; }
 
     //For threading
     let (tx1, rx1) : (Sender<()>, Receiver<()>) = channel();
     let (tx2, rx2) : (Sender<()>, Receiver<()>) = channel();
     let (tx_trigger,rx_trigger) = channel();
+    let settings_cpy1 = settings.clone();
+    let settings_cpy2 = settings.clone();
+
     let threads = (
-        thread::spawn( move || thread_generic(tx1, rx2, Some(rx_trigger) ,TaskId::A, (&settings).clone())),
-        thread::spawn( move || thread_generic(tx2, rx1, None, TaskId::B, (&settings).clone())),
+        thread::spawn( move || thread_generic(tx1, rx2, Some(rx_trigger) ,TaskId::A, settings_cpy1)),
+        thread::spawn( move || thread_generic(tx2, rx1, None, TaskId::B, settings_cpy2)),
     );
     std::thread::sleep(Duration::from_micros(shared::LAZY_START));
     _ = tx_trigger.send(());
-    shared::format_str(&threads.0.join().unwrap(), &threads.1.join().unwrap() ,"tokio_diff_thread.csv")?;
+    if settings.output_file.is_empty() {
+        shared::format_str(&threads.0.join().unwrap(), &threads.1.join().unwrap() ,"tokio_diff_thread.csv")?;
+    }
+    else {
+        let mut title = String::from("thread_");
+        title.push_str(settings.output_file.as_str());
+        shared::format_str(&threads.0.join().unwrap(), &threads.1.join().unwrap() , title.as_str())?;
+    }
 
     Ok(())
 }

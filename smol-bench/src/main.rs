@@ -62,6 +62,10 @@ fn main() -> io::Result<()> {
         _ = tx_trig.send(()).await;
         future_r.await
     });
-    shared::format_str(&r.0, &r.1 ,"smol_diff.csv")?;
+
+    if settings.output_file.is_empty() {
+        shared::format_str(&r.0, &r.1 ,"smol_diff.csv")?; }
+    else {
+        shared::format_str(&r.0, &r.1 ,&settings.output_file.as_str())?; }
     Ok(())
 }
